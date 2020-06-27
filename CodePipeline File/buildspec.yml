@@ -1,0 +1,60 @@
+version: 0.2
+env:
+  variables:
+    ADMIN_TABLE: admin-service
+    ADMIN_SESSIONS_TABLE: admin-service-sessions
+    LAMBDA_FUNCTION_NAME: admin-service-function
+    ADMIN_WS_CONNECTION_TABLE: admin-service-websocket-connections
+    WEB_SOCKET_ENDPOINT: https://x15lra2p45.execute-api.ap-south-1.amazonaws.com/dev
+  parameter-store:
+    USERPOOL_ID: '/dev/USER_POOL_ID'
+    USERPOOL_CLIENT_ID: '/dev/USER_POOL_CLIENTID'
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 12
+    commands:
+      - npm install
+  pre_build:
+    commands:
+      - echo Staring the pre build stage
+      - touch .env
+      - echo "USER_POOL_ID=$USERPOOL_ID" >> .env
+      - echo "USER_POOL_CLIENT_ID=$USERPOOL_CLIENT_ID" >> .env
+      - echo "ADMIN_TABLE=$ADMIN_TABLE" >> .env
+      - echo "ADMIN_SESSIONS_TABLE=$ADMIN_SESSIONS_TABLE" >> .env
+      - echo "ADMIN_WS_CONNECTION_TABLE=$ADMIN_WS_CONNECTION_TABLE" >> .env
+      - echo "WEB_SOCKET_ENDPOINT=$WEB_SOCKET_ENDPOINT" >> .env
+      - echo Login into docker now
+      - $(aws ecr get-login --region ap-south-1 --no-include-email)
+      - echo Login successful
+      - REPOSITORY_URI=303669817364.dkr.ecr.ap-south-1.amazonaws.com/admin-service
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - printf '[{"name":"simplehttp-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:$IMAGE_TAG > imageDetail.json
+artifacts:
+  files:
+    - 'image*.json'
+    - 'appspec.yaml'
+    - 'taskdef.json'
+  secondary-artifacts:
+    DefinitionArtifact:
+      files:
+        - appspec.yaml
+        - taskdef.json
+    ImageArtifact:
+      files:
+        - imageDetail.json

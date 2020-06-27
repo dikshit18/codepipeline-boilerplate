@@ -1,0 +1,17 @@
+//run a docker image
+docker run --name admin_service -P -d nginx
+
+//details for a docker container
+docker inspect <container Id>
+
+//Stop a docker container
+docker stop <container Id>
+
+//Delete a docker container
+docker rm <container Id>
+
+//check for a docker container
+docker logs <container Id>
+
+//docker delete image
+docker rmi <imageID>
